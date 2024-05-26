@@ -1,0 +1,67 @@
+import dash
+from dash import dcc, html
+from dash.dependencies import Input, Output
+import pandas as pd
+import plotly.express as px
+from conexion_sql import conexion
+
+# Crea una instancia de la aplicación Dash
+from app import app
+
+# Define el diseño de la página 4 (Gráfico de Burbujas)
+def layout():
+    return html.Div([
+        html.H1("Gráfico de Burbujas"),
+        
+        # Dropdown para seleccionar la combinación de variables
+        dcc.Dropdown(
+            id='bubble-chart-dropdown',
+            options=[
+                {'label': 'Nacionalidad vs. Continente vs. Cantidad de Pasajeros', 'value': 'nationality_vs_continent_vs_passengers'},
+                {'label': 'Estado de Vuelo vs. Aeropuerto de Destino vs. Cantidad de Vuelos', 'value': 'flight_status_vs_arrival_airport_vs_flights'}
+            ],
+            value='nationality_vs_continent_vs_passengers',  # Valor predeterminado
+            multi=False
+        ),
+        
+        # Div para mostrar el gráfico de burbujas
+        dcc.Graph(id='bubble-chart')
+    ])
+
+# Callback para actualizar el gráfico de burbujas
+@app.callback(
+    Output('bubble-chart', 'figure'),
+    [Input('bubble-chart-dropdown', 'value')]
+)
+def update_bubble_chart(selected_option):
+    if selected_option == 'nationality_vs_continent_vs_passengers':
+        query = """
+        SELECT nationality, continents, COUNT(*) as count
+        FROM datos_pasajeros
+        GROUP BY nationality, continents
+        ORDER BY count DESC
+        LIMIT 10
+        """
+    elif selected_option == 'flight_status_vs_arrival_airport_vs_flights':
+        query = """
+        SELECT flight_status, arrival_airport, COUNT(*) as count
+        FROM datos_pasajeros
+        GROUP BY flight_status, arrival_airport
+        ORDER BY count DESC
+        LIMIT 10
+        """
+    
+    # Conecta a la base de datos y ejecuta la consulta
+    conn = conexion()
+    df = pd.read_sql_query(query, conn)
+    conn.close()
+    
+    # Crea el gráfico de burbujas
+    fig = px.scatter(df, x='nationality' if selected_option == 'nationality_vs_continent_vs_passengers' else 'flight_status',
+                     y='continents' if selected_option == 'nationality_vs_continent_vs_passengers' else 'arrival_airport',
+                     size='count', title=f'{selected_option.capitalize()}',
+                     labels={'count': 'Cantidad de Pasajeros' if selected_option == 'nationality_vs_continent_vs_passengers' else 'Cantidad de Vuelos'})
+    
+    return fig
+
+
